@@ -188,23 +188,58 @@ pollIVar (IVar ref) =
 
 data IVarContents a = Full a | Empty | Blocked [a -> Trace]
 
-data Q a = CQ [a] [a]
+-- data Q a = CQ [a] [a]
+-- 
+-- newQ :: Q a
+-- newQ = CQ [] []
+-- 
+-- deQ :: Q a -> (Q a, Maybe a)
+-- deQ (CQ (x:xs) rs) = (CQ xs rs, Just x)
+-- deQ (CQ [] [])     = (CQ [] [], Nothing)
+-- deQ (CQ [] rs)     = (CQ xs [], Just x)
+--     where (x:xs) = reverse rs
+-- 
+-- enQ :: Q a -> a -> Q a
+-- enQ (CQ xs rs) x = CQ xs (x:rs)
+-- 
+-- toListQ :: Q a -> [a]
+-- toListQ (CQ ls rs) = ls ++ reverse rs
+
+
+
+-- An implementation of Okasaki's 'Simple and Efficient Puerly Functional
+-- Queues and Deques'
+
+data Q a = Q ![a] ![a] ![a]
+
+instance Show (Q a) where
+    show (Q l r l') 
+        = "Q "
+        ++ show (map (const ()) l) ++ " "
+        ++ show (map (const ()) r) ++ " ("
+        ++ show (map (const ()) l') ++ ")"
 
 newQ :: Q a
-newQ = CQ [] []
-
-deQ :: Q a -> (Q a, Maybe a)
-deQ (CQ (x:xs) rs) = (CQ xs rs, Just x)
-deQ (CQ [] [])     = (CQ [] [], Nothing)
-deQ (CQ [] rs)     = (CQ xs [], Just x)
-    where (x:xs) = reverse rs
+newQ = Q [] [] []
 
 enQ :: Q a -> a -> Q a
-enQ (CQ xs rs) x = CQ xs (x:rs)
+enQ (Q l r l') x = makeQ l (x:r) l'
 
-toListQ :: Q a -> [a]
-toListQ (CQ ls rs) = ls ++ reverse rs
+deQ :: Q a -> (Q a, Maybe a)
+deQ q@(Q [] [] _)   = (q, Nothing)
+deQ (Q (x:ls) r l') = (makeQ ls r l', Just x)
+deQ q               = error $ "deQ: error dequing from: " ++ show q
 
+makeQ :: [a] -> [a] -> [a] -> Q a
+makeQ l r []     = Q l' [] l'
+    where l'     = rotQ l r []
+makeQ l r (_:l') = Q l r l'
+
+
+rotQ [] (r:_) a      = r:a
+rotQ (l:ls) (r:rs) a = l : rotQ ls rs (r:a)
+rotQ a b c           = error $ "rotQ: this should never happen (or so says Okasaki!) "
+                               ++ unwords (map (show . map (const ())) [a,b,c])
 
 {-# INLINE runPar_internal #-}
 runPar_internal :: Bool -> Par a -> a
