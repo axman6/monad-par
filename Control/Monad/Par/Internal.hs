@@ -51,15 +51,15 @@ sched _doSync queue t = loop t
          Full a -> loop (c a)
          _other -> do
            r <- atomicModifyIORef v $ \e -> case e of
-                        Empty    -> (Blocked [c], reschedule queue)
+                        Empty    -> (Blocked newQ, reschedule queue)
                         Full a   -> (Full a,      loop (c a))
-                        Blocked cs -> (Blocked (c:cs), reschedule queue)
+                        Blocked cs -> (Blocked (cs `enQ` c), reschedule queue)
            r
     Put (IVar v) a t  -> do
       cs <- atomicModifyIORef v $ \e -> case e of
                Empty    -> (Full a, [])
                Full _   -> error "multiple put"
-               Blocked cs -> (Full a, cs)
+               Blocked cs -> (Full a, toListQ cs)
       mapM_ (pushWork queue. ($a)) cs
       loop t
     Fork child parent -> do
@@ -186,7 +186,24 @@ pollIVar (IVar ref) =
        _      -> return (Nothing)
 
 
-data IVarContents a = Full a | Empty | Blocked [a -> Trace]
+data IVarContents a = Full a | Empty | Blocked (ConcQ (a -> Trace))
+
+data ConcQ a = CQ [a] [a]
+
+newQ :: ConcQ a
+newQ = CQ [] []
+
+deQ :: ConcQ a -> (Maybe a, ConcQ a)
+deQ (CQ (x:xs) rs) = (Just x, CQ xs rs)
+deQ (CQ [] rs)     = (Just x, CQ xs [])
+    where (x:xs) = reverse rs
+deQ (CQ [] []) = (Nothing, CQ [] [])
+
+enQ :: ConcQ a -> a -> ConcQ a
+enQ (CQ xs rs) x = CQ xs (x:rs)
+
+toListQ :: ConcQ a -> [a]
+toListQ (CQ ls rs) = ls ++ reverse rs
 
 
 {-# INLINE runPar_internal #-}
