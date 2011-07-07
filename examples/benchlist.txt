@@ -5,7 +5,8 @@ parfib sparks 36
 
 blackscholes 10000 15000000
 
-cholesky 1000 50 cholesky_matrix1000.dat
+# cholesky 1000 50 cholesky_matrix1000.dat
+cholesky 6 50 cholesky_matrix6.dat
 
 nbody  13000
 
